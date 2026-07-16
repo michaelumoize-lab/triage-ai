@@ -17,7 +17,7 @@ export default function Home() {
     setDiagnosis(null);
 
     try {
-      const response = await fetch("/api/diagnose", {
+      const response = await fetch("/api/v1/diagnose", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
