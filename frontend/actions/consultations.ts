@@ -23,7 +23,7 @@ export async function updateConsultation(data: {
   });
 
   revalidatePath(`/consultations/${data.consultationId}`);
-  revalidatePath(`/patients/*`);
+  revalidatePath("/patients", "layout");
 }
 
 export async function updateConsultationWithNewDiagnosis(data: {
@@ -53,5 +53,5 @@ export async function updateConsultationWithNewDiagnosis(data: {
   });
 
   revalidatePath(`/consultations/${data.consultationId}`);
-  revalidatePath(`/patients/*`);
+  revalidatePath("/patients", "layout");
 }
