@@ -1,0 +1,297 @@
+// ============================================
+// GENERATOR & DATASOURCE
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum ConsultationStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum BloodType {
+  A_POSITIVE
+  A_NEGATIVE
+  B_POSITIVE
+  B_NEGATIVE
+  AB_POSITIVE
+  AB_NEGATIVE
+  O_POSITIVE
+  O_NEGATIVE
+  UNKNOWN
+}
+
+// ============================================
+// BETTER AUTH SCHEMA (EXACT MATCH)
+// ============================================
+
+model User {
+  id            String  @id
+  name          String
+  email         String  @unique
+  emailVerified Boolean
+  image         String?
+
+  // 👇 Custom fields for doctors (no roles needed)
+  specialty   String? // e.g., "Cardiologist", "Dermatologist"
+  phone       String?
+  isActive    Boolean   @default(true)
+  lastLoginAt DateTime?
+
+  createdAt DateTime @db.Timestamptz(3)
+  updatedAt DateTime @db.Timestamptz(3)
+
+  // Relations
+  sessions        Session[]
+  accounts        Account[]
+  patients        Patient[]
+  consultations   Consultation[]
+  feedback        Feedback[]
+  createdPatients Patient[]      @relation("PatientCreator")
+  auditLogs       AuditLog[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  token     String   @unique
+  expiresAt DateTime @db.Timestamptz(3)
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @db.Timestamptz(3)
+  updatedAt DateTime @db.Timestamptz(3)
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  userId                String
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  accessTokenExpiresAt  DateTime? @db.Timestamptz(3)
+  refreshTokenExpiresAt DateTime? @db.Timestamptz(3)
+  scope                 String?
+  idToken               String?
+  password              String?
+  createdAt             DateTime  @db.Timestamptz(3)
+  updatedAt             DateTime  @db.Timestamptz(3)
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime @db.Timestamptz(3)
+  createdAt  DateTime @db.Timestamptz(3)
+  updatedAt  DateTime @db.Timestamptz(3)
+
+  @@map("verification")
+}
+
+// ============================================
+// DOCTOR APP MODELS
+// ============================================
+
+/// Patients registered by doctors
+model Patient {
+  id        String    @id @default(cuid())
+  userId    String // Doctor who registered this patient
+  name      String
+  age       Int?
+  gender    Gender?
+  bloodType BloodType @default(UNKNOWN)
+  phone     String?
+  email     String?
+  address   String?
+
+  // Medical history
+  allergies         String?
+  chronicConditions String[] // Array of condition names
+  medications       String[] // Array of current medications
+  medicalHistory    Json? // Additional flexible JSON data
+
+  // Soft delete
+  deletedAt  DateTime?
+  isArchived Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  doctor        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  consultations Consultation[]
+  createdBy     User?          @relation("PatientCreator", fields: [createdById], references: [id])
+  createdById   String?
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@index([isArchived])
+  @@map("patients")
+}
+
+/// Consultation/Prediction records
+model Consultation {
+  id        String @id @default(cuid())
+  patientId String
+  doctorId  String
+
+  // Symptoms - using Json for flexibility
+  symptoms         Json // Array of 132 symptom values (0/1)
+  selectedSymptoms Json? // List of symptom indices selected (stored as JSON array)
+  symptomNames     Json? // Human-readable symptom names (stored as JSON array)
+
+  // Prediction Results
+  predictedDisease String?
+  confidence       Float?
+  topPredictions   Json? // Array of {disease, probability}
+  explanation      Json? // SHAP/LIME feature importance
+
+  // Doctor's final decision
+  actualDiagnosis String? // Doctor's confirmed diagnosis
+  doctorNotes     String?
+  status          ConsultationStatus @default(PENDING)
+
+  // Emergency flag
+  isEmergency       Boolean  @default(false)
+  emergencySymptoms String[] // Which symptoms triggered the flag
+
+  // Referral
+  referredTo String? // Specialist referred to
+
+  // Audit trail
+  createdBy String? // Which user created this record
+  updatedBy String? // Which user last updated it
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  patient  Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor   User      @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  feedback Feedback?
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([createdAt])
+  @@index([status])
+  @@index([isEmergency])
+  @@map("consultations")
+}
+
+/// Feedback from doctors to improve the model
+model Feedback {
+  id             String @id @default(cuid())
+  consultationId String @unique
+  doctorId       String
+
+  // Feedback details
+  wasCorrect       Boolean // Was the AI prediction correct?
+  actualDisease    String // What was the actual disease?
+  confidenceRating Int? // 1-5, how confident was the doctor?
+  comments         String?
+
+  // For model improvement
+  symptoms Json? // The symptoms that were used (for retraining)
+
+  // Tracking for model retraining
+  usedForRetraining Boolean   @default(false)
+  retrainedAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  consultation Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  doctor       User         @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([wasCorrect])
+  @@index([usedForRetraining])
+  @@map("feedbacks")
+}
+
+/// Audit log for compliance
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String // e.g., "CREATE", "UPDATE", "DELETE", "VIEW"
+  entityType String // e.g., "Patient", "Consultation", "User"
+  entityId   String
+  changes    Json? // What changed (before/after)
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([entityType])
+  @@map("audit_logs")
+}
+
+// ============================================
+// STATIC DATA MODELS (Reference Tables)
+// ============================================
+
+/// Symptom dictionary (for reference)
+model Symptom {
+  id             Int     @id
+  index          Int     @unique // Position in the 132-array (0-131)
+  name           String  @unique // e.g., "itching", "skin_rash"
+  category       String? // e.g., "Skin", "Respiratory", "Digestive"
+  description    String?
+  isEmergency    Boolean @default(false)
+  emergencyLevel Int? // 1-5, how urgent
+
+  @@index([index])
+  @@index([category])
+  @@map("symptoms")
+}
+
+/// Disease dictionary (for reference)
+model Disease {
+  id          Int     @id
+  name        String  @unique
+  category    String? // e.g., "Infectious", "Cardiovascular"
+  description String?
+  isEmergency Boolean @default(false)
+  specialist  String? // e.g., "Cardiologist", "Dermatologist"
+  symptoms    Json? // Common symptoms for this disease (stored as JSON array)
+  treatment   String? // General treatment information
+
+  @@index([category])
+  @@map("diseases")
+}
