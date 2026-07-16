@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SymptomInput } from "@/types";
 
 export async function POST(request: NextRequest) {
   try {
-    const body: SymptomInput = await request.json();
+    const body = await request.json();
 
-    // Proxy to FastAPI backend
+    // Use environment variable from Vercel binding
     const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
+
     const response = await fetch(`${backendUrl}/api/v1/diagnose`, {
       method: "POST",
       headers: {
