@@ -68,27 +68,19 @@ export default async function DashboardPage() {
     redirect("/sign-in");
   }
 
-  const [patients, consultations, stats] = await Promise.all([
-    db.getPatients(session.user.id),
+  const [allPatients, consultations] = await Promise.all([
+    db.getPatients(session.user.id, true),
     db.getConsultations(session.user.id),
-    // Get stats
-    (async () => {
-      const allPatients = await db.getPatients(session.user.id, true);
-      const allConsultations = await db.getConsultations(session.user.id);
-      const urgentCases = allConsultations.filter((c) => c.isEmergency);
-
-      return {
-        totalPatients: allPatients.length,
-        totalConsultations: allConsultations.length,
-        urgentCases: urgentCases.length,
-        todayConsultations: allConsultations.filter(
-          (c) =>
-            new Date(c.createdAt).toDateString() === new Date().toDateString(),
-        ).length,
-      };
-    })(),
   ]);
 
+  const stats = {
+    totalPatients: allPatients.length,
+    totalConsultations: consultations.length,
+    urgentCases: consultations.filter((c) => c.isEmergency).length,
+    todayConsultations: consultations.filter(
+      (c) => new Date(c.createdAt).toDateString() === new Date().toDateString(),
+    ).length,
+  };
   return (
     <div className="p-6 space-y-8">
       {/* Header */}

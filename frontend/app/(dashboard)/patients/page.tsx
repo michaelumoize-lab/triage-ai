@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 type SearchParams = Promise<{
   search?: string;
   page?: string;
-  showArchived?: string; // ✅ add this
+  showArchived?: string;
 }>;
 
 export default async function PatientsPage({
@@ -23,16 +23,18 @@ export default async function PatientsPage({
   }
 
   const params = await searchParams;
-  const page = parseInt(params.page ?? "1", 10);
+  const requestedPage = Number(params.page ?? "1");
+  const page =
+    Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   const search = params.search ?? "";
-  const showArchived = params.showArchived === "true"; // ✅ parse boolean
+  const showArchived = params.showArchived === "true";
 
   const { items, total, totalPages } = await db.searchPatients({
     userId: session.user.id,
     search,
     page,
     pageSize: 10,
-    includeArchived: showArchived, // ✅ pass it
+    includeArchived: showArchived,
   });
 
   return (
@@ -41,7 +43,7 @@ export default async function PatientsPage({
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Patients</h1>
           <p className="text-muted-foreground">
-            Manage your patient recpass itords and consultations
+            Manage your patient records and consultations
           </p>
         </div>
         <AddPatientButton />

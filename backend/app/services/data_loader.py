@@ -7,10 +7,9 @@ from typing import List, Tuple
 class DataLoader:
     def __init__(self, data_path: str | None = None):
         if data_path is None:
-            self.data_path = Path(__file__).parent.parent.parent / "data" / "symbipredict_2022.csv"
+            self.data_path = Path(__file__).parent.parent / "data" / "symbipredict_2022.csv"
         else:
-            self.data_path = Path(data_path)
-    
+            self.data_path = Path(data_path)    
     def load_dataset(self) -> pd.DataFrame:
         """Load the dataset from CSV"""
         if not self.data_path.exists():

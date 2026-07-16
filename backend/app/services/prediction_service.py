@@ -2,7 +2,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Set
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,6 +15,8 @@ class PredictionService:
         self.label_encoder = None
         self.symptom_columns = None
         self._load_assets()
+        # Build a set of known disease labels for exact matching
+        self.known_diseases: Set[str] = set(self.label_encoder.classes_) if self.label_encoder else set()
 
     def _load_assets(self):
         try:
@@ -31,12 +33,21 @@ class PredictionService:
 
     def predict(self, symptoms: List[str]) -> Dict:
         """Predict disease from symptom list."""
+        # 1. Validate input symptoms
+        if not symptoms:
+            raise ValueError("Empty symptom list provided.")
+        unknown = sorted(set(symptoms) - set(self.symptom_columns))
+        if unknown:
+            raise ValueError(f"Unknown symptoms: {', '.join(unknown)}")
+
+        # 2. Build feature vector
         feature = np.zeros(len(self.symptom_columns))
         for i, col in enumerate(self.symptom_columns):
             if col in symptoms:
                 feature[i] = 1
         X = pd.DataFrame([feature], columns=self.symptom_columns)
 
+        # 3. Predict probabilities
         probs = self.model.predict_proba(X)[0]
         top_indices = np.argsort(probs)[-3:][::-1]
 
@@ -54,11 +65,14 @@ class PredictionService:
         }
 
     def get_triage_level(self, symptoms: List[str], red_flags: Optional[List[str]] = None) -> str:
-        """Determine triage level based on emergency symptoms or red flags."""
+        """
+        Determine triage level based ONLY on red‑flag rules (acuity), NOT on model confidence.
+        """
         # Combine symptoms and red flags
-        all_symptoms = symptoms + (red_flags if red_flags else [])
+        all_symptoms = set(symptoms + (red_flags if red_flags else []))
 
-        emergency = {
+        # Emergency rules (exact matches)
+        emergency_rules = {
             "chest_pain": "immediate",
             "shortness_of_breath": "immediate",
             "coma": "immediate",
@@ -66,43 +80,43 @@ class PredictionService:
             "acute_liver_failure": "emergency",
             "blood_in_sputum": "emergency",
         }
-        for sym in all_symptoms:
-            if sym in emergency:
-                return emergency[sym]
 
-        # Fallback to confidence
-        result = self.predict(symptoms)
-        confidence = result["confidence"]
-        if confidence > 0.8:
-            return "urgent"
-        if confidence > 0.6:
-            return "semi_urgent"
+        for sym in all_symptoms:
+            if sym in emergency_rules:
+                return emergency_rules[sym]
+
+        # No red flags → non‑urgent by default
         return "non_urgent"
 
     def get_red_flags(self, symptoms: List[str], input_red_flags: Optional[List[str]] = None) -> List[str]:
         """Return red flags from both input and auto-detection."""
-        flags = []
+        flags = set()
         if input_red_flags:
-            flags.extend(input_red_flags)
+            flags.update(input_red_flags)
 
-        # Auto-detect from symptoms
+        # Auto-detect from symptoms (exact matches)
         auto_detect = {
-            "chest_pain": "chest_pain",
-            "shortness_of_breath": "shortness_of_breath",
-            "coma": "coma",
-            "stomach_bleeding": "stomach_bleeding",
-            "acute_liver_failure": "acute_liver_failure",
-            "blood_in_sputum": "blood_in_sputum",
+            "chest_pain",
+            "shortness_of_breath",
+            "coma",
+            "stomach_bleeding",
+            "acute_liver_failure",
+            "blood_in_sputum",
         }
         for symptom in symptoms:
-            if symptom in auto_detect and symptom not in flags:
-                flags.append(symptom)
+            if symptom in auto_detect:
+                flags.add(symptom)
 
-        return flags
+        return sorted(flags)
 
     def get_specialist_recommendation(self, disease: str) -> str:
-        """Map disease to specialist."""
-        mapping = {
+        """
+        Map exact disease label to a specialist.
+        Uses a canonical mapping that matches the exact labels from the model.
+        """
+        # This mapping must exactly match the labels emitted by the label_encoder.
+        # All keys are taken from the training data's "prognosis" column.
+        specialist_map = {
             "Fungal infection": "Dermatologist",
             "Allergy": "Allergist",
             "GERD": "Gastroenterologist",
@@ -144,4 +158,13 @@ class PredictionService:
             "Psoriasis": "Dermatologist",
             "Impetigo": "Dermatologist",
         }
-        return mapping.get(disease, "General Practitioner")
+
+        # If the disease is not in the map, log a warning and return a default.
+        if disease not in specialist_map:
+            logger.warning(f"No specialist mapping for disease: '{disease}'. Using General Practitioner.")
+            # Optionally, you could also check against known diseases to catch typos.
+            if disease not in self.known_diseases:
+                logger.warning(f"Unrecognised disease: '{disease}'. It may not match the model's labels.")
+            return "General Practitioner"
+
+        return specialist_map[disease]

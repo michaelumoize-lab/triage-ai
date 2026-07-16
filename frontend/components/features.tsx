@@ -32,9 +32,9 @@ export function Features() {
     },
     {
       icon: <Shield className="h-6 w-6 text-primary" />,
-      title: "Clinical Validation",
+      title: "Clinically Trained",
       description:
-        "Trained on 4,961 real patient cases with 100% accuracy on test data.",
+        "Trained on 4,961 clinical cases with strong test‑set performance. Designed as a decision‑support tool – not a standalone diagnostic device.",
     },
     {
       icon: <TrendingUp className="h-6 w-6 text-primary" />,
@@ -46,7 +46,7 @@ export function Features() {
       icon: <Users className="h-6 w-6 text-primary" />,
       title: "Patient Management",
       description:
-        "Keep complete patient histories, track consultations, and manage medical records securely.",
+        "Keep complete patient histories, track consultations, and manage medical records in one place.",
     },
     {
       icon: <Workflow className="h-6 w-6 text-primary" />,
@@ -56,16 +56,15 @@ export function Features() {
     },
     {
       icon: <Lock className="h-6 w-6 text-primary" />,
-      title: "Enterprise Security",
+      title: "Enterprise‑Ready Security",
       description:
-        "HIPAA-compliant architecture. All data encrypted. Perfect for clinical environments.",
+        "Built with security and privacy in mind. Suitable for clinical environments with proper deployment and compliance measures.",
     },
   ];
 
   return (
     <section id="features" className="py-20 px-4 sm:px-6 lg:px-8 bg-muted/20">
       <div className="max-w-7xl mx-auto">
-        {/* Section header */}
         <div className="mb-16">
           <h2 className="text-4xl sm:text-5xl font-bold text-foreground mb-4">
             Clinical Precision, Delivered
@@ -76,7 +75,6 @@ export function Features() {
           </p>
         </div>
 
-        {/* Features grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {features.map((feature, idx) => (
             <FeatureCard

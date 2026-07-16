@@ -44,6 +44,16 @@ interface DiagnosisResponse {
   treatment_urgency?: string;
 }
 
+// Type for the diagnosis API payload
+type DiagnoseRequestPayload = {
+  patient_id: string;
+  symptoms: string[];
+  age?: number | null;
+  gender?: string | null;
+  duration_days?: number | null;
+  red_flags?: string[];
+};
+
 // ============================================
 // COMPONENT
 // ============================================
@@ -61,16 +71,33 @@ export function DiagnosisForm({
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [result, setResult] = useState<DiagnosisResponse | null>(null);
   const [step, setStep] = useState<"select" | "symptoms" | "result">("select");
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Find the selected patient object (used for demographics)
+  const selectedPatient = patients.find((p) => p.id === selectedPatientId);
 
   const diagnosisMutation = useMutation({
     mutationFn: async () => {
+      // Build typed payload with symptoms and demographics
+      const payload: DiagnoseRequestPayload = {
+        patient_id: selectedPatientId!,
+        symptoms: selectedSymptoms,
+      };
+
+      if (selectedPatient) {
+        if (selectedPatient.age !== null && selectedPatient.age !== undefined) {
+          payload.age = selectedPatient.age;
+        }
+        if (selectedPatient.gender) {
+          payload.gender = selectedPatient.gender;
+        }
+        // duration_days could be added here if stored
+      }
+
       const response = await fetch("/api/diagnose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          patient_id: selectedPatientId,
-          symptoms: selectedSymptoms,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -112,6 +139,10 @@ export function DiagnosisForm({
   const handleSave = async () => {
     if (!result || !selectedPatientId) return;
 
+    // Prevent duplicate saves
+    if (isSaving) return;
+
+    setIsSaving(true);
     try {
       const response = await fetch("/api/diagnosis/save", {
         method: "POST",
@@ -121,7 +152,7 @@ export function DiagnosisForm({
           symptoms: selectedSymptoms,
           predictedDisease: result.primary_diagnosis.condition,
           confidence: result.primary_diagnosis.probability,
-          topPredictions: result.differential_diagnoses, // ✅ Already the correct shape
+          topPredictions: result.differential_diagnoses,
           isEmergency:
             result.triage_level === "immediate" ||
             result.triage_level === "emergency",
@@ -142,6 +173,8 @@ export function DiagnosisForm({
       toast.error(
         error instanceof Error ? error.message : "Failed to save diagnosis",
       );
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -185,8 +218,16 @@ export function DiagnosisForm({
               <div className="text-sm">
                 Patient:{" "}
                 <span className="font-medium">
-                  {patients.find((p) => p.id === selectedPatientId)?.name}
+                  {selectedPatient?.name || "Not selected"}
                 </span>
+                {selectedPatient && (
+                  <span className="ml-2 text-muted-foreground">
+                    {selectedPatient.age ? `Age: ${selectedPatient.age}` : ""}
+                    {selectedPatient.gender
+                      ? ` • ${selectedPatient.gender}`
+                      : ""}
+                  </span>
+                )}
               </div>
             </div>
           </CardContent>
@@ -218,7 +259,7 @@ export function DiagnosisForm({
         <DiagnosisActions
           onSave={handleSave}
           onRetry={handleReset}
-          isSaving={false}
+          isSaving={isSaving}
         />
       </div>
     );

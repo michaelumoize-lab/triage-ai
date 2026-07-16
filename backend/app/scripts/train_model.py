@@ -1,4 +1,3 @@
-# backend/scripts/train_model.py
 """
 Train the Random Forest model for symptom-based disease prediction.
 
@@ -75,16 +74,18 @@ def load_feedback_data(path: Path) -> pd.DataFrame | None:
 def preprocess_data(df: pd.DataFrame, feedback_df: pd.DataFrame | None = None) -> tuple[pd.DataFrame, pd.Series]:
     """
     Combine original data with feedback and return features (X) and labels (y).
+    Normalises labels by stripping whitespace to avoid trailing spaces.
     """
-    # Original features and target
+    # Original features and target – strip whitespace from prognosis labels
     X_orig = df.drop("prognosis", axis=1)
-    y_orig = df["prognosis"]
+    y_orig = df["prognosis"].astype(str).str.strip()  # <-- Normalise labels
 
-    # If feedback is provided, append it
     if feedback_df is not None and not feedback_df.empty:
-        # Assume feedback has the same symptom columns + 'actualDisease' as target
+        # Feedback data: ensure it has the same symptom columns + 'actualDisease'
+        # Strip whitespace from actualDisease as well
         X_fb = feedback_df.drop("actualDisease", axis=1)
-        y_fb = feedback_df["actualDisease"]
+        y_fb = feedback_df["actualDisease"].astype(str).str.strip()  # <-- Normalise feedback labels
+
         X = pd.concat([X_orig, X_fb], axis=0, ignore_index=True)
         y = pd.concat([y_orig, y_fb], axis=0, ignore_index=True)
         logger.info(f"Combined dataset: {len(X)} rows ({len(X_orig)} original + {len(X_fb)} feedback)")
@@ -197,7 +198,7 @@ def train_pipeline(with_feedback: bool = False):
     df = load_dataset(DATA_PATH)
     feedback_df = load_feedback_data(FEEDBACK_PATH) if with_feedback else None
 
-    # 2. Preprocess
+    # 2. Preprocess (labels are normalised inside)
     X, y = preprocess_data(df, feedback_df)
     feature_columns = X.columns.tolist()
     logger.info(f"Feature columns: {len(feature_columns)}")
@@ -206,13 +207,13 @@ def train_pipeline(with_feedback: bool = False):
     label_encoder = LabelEncoder()
     y_enc = label_encoder.fit_transform(y)
     logger.info(f"Unique diseases: {len(label_encoder.classes_)}")
+    # Log the first few labels to verify they are clean
+    logger.info(f"Sample disease labels (first 5): {label_encoder.classes_[:5].tolist()}")
 
     # 4. Split data (stratified)
-    # First split test set
     X_temp, X_test, y_temp, y_test = train_test_split(
         X, y_enc, test_size=TEST_SIZE, random_state=RANDOM_SEED, stratify=y_enc
     )
-    # Then split validation from training set
     X_train, X_val, y_train, y_val = train_test_split(
         X_temp, y_temp, test_size=VALIDATION_SIZE, random_state=RANDOM_SEED, stratify=y_temp
     )
@@ -227,7 +228,7 @@ def train_pipeline(with_feedback: bool = False):
     # 7. Save artifacts
     save_artifacts(model, label_encoder, feature_columns, metrics, report, val_acc)
 
-    # 8. Optional cross-validation score
+    # 8. Cross-validation
     cv_scores = cross_val_score(model, X, y_enc, cv=5, scoring='accuracy')
     logger.info(f"Cross-validation accuracy (mean ± std): {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
 

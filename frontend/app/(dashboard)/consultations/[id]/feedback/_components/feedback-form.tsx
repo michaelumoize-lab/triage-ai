@@ -101,11 +101,10 @@ export function FeedbackForm({
             <div>
               <span className="text-muted-foreground">Confidence:</span>
               <span className="font-medium ml-2">
-                {consultation.confidence
+                {consultation.confidence !== null
                   ? `${(consultation.confidence * 100).toFixed(0)}%`
                   : "N/A"}
-              </span>
-            </div>
+              </span>            </div>
             <div>
               <span className="text-muted-foreground">Date:</span>
               <span className="font-medium ml-2">

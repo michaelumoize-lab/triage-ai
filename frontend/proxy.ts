@@ -11,9 +11,10 @@ const protectedRoutes = [
   "/patients/:path*",
   "/diagnosis",
   "/diagnosis/:path*",
+  "/consultations",
+  "/consultations/:path*",
   "/settings",
 ];
-
 // Auth routes (redirect to dashboard if already logged in)
 const authRoutes = ["/sign-in", "/sign-up"];
 

@@ -20,14 +20,19 @@ export const metadata = {
 
 export default function LandingPage() {
   return (
-    <main className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background">
       <Navbar />
-      <Hero />
-      <Features />
-      <HowItWorks />
-      <Benefits />
-      <CTASection />
+      <main>
+        <Hero />
+        <Features />
+        <HowItWorks />
+        <Benefits />
+        <CTASection />
+      </main>
       <Footer />
+    </div>
+  );
+}
     </main>
   );
 }

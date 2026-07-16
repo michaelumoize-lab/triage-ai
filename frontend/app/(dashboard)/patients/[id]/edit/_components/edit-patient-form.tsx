@@ -1,4 +1,3 @@
-// app/(dashboard)/patients/[id]/edit/_components/edit-patient-form.tsx
 "use client";
 
 import { useState, useTransition } from "react";
@@ -67,15 +66,13 @@ export function EditPatientForm({ patient }: EditPatientFormProps) {
         const formDataObj = new FormData();
         formDataObj.append("name", formData.name);
 
-        if (formData.age) formDataObj.append("age", formData.age);
-        if (formData.gender) formDataObj.append("gender", formData.gender);
-        if (formData.bloodType)
-          formDataObj.append("bloodType", formData.bloodType);
-        if (formData.phone) formDataObj.append("phone", formData.phone);
-        if (formData.email) formDataObj.append("email", formData.email);
-        if (formData.address) formDataObj.append("address", formData.address);
-        if (formData.allergies)
-          formDataObj.append("allergies", formData.allergies);
+        formDataObj.append("age", formData.age);
+        formDataObj.append("gender", formData.gender);
+        formDataObj.append("bloodType", formData.bloodType);
+        formDataObj.append("phone", formData.phone);
+        formDataObj.append("email", formData.email);
+        formDataObj.append("address", formData.address);
+        formDataObj.append("allergies", formData.allergies);
 
         formDataObj.append("chronicConditions", formData.chronicConditions);
         formDataObj.append("medications", formData.medications);
@@ -112,6 +109,7 @@ export function EditPatientForm({ patient }: EditPatientFormProps) {
                 required
               />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="age">Age</Label>
               <Input
@@ -123,6 +121,7 @@ export function EditPatientForm({ patient }: EditPatientFormProps) {
                 }
               />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="gender">Gender</Label>
               <Select
@@ -131,7 +130,7 @@ export function EditPatientForm({ patient }: EditPatientFormProps) {
                   setFormData((prev) => ({ ...prev, gender: val ?? "" }))
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger id="gender">
                   <SelectValue placeholder="Select gender" />
                 </SelectTrigger>
                 <SelectContent>
@@ -141,6 +140,7 @@ export function EditPatientForm({ patient }: EditPatientFormProps) {
                 </SelectContent>
               </Select>
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="bloodType">Blood Type</Label>
               <Select
@@ -152,7 +152,7 @@ export function EditPatientForm({ patient }: EditPatientFormProps) {
                   }))
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger id="bloodType">
                   <SelectValue placeholder="Select blood type" />
                 </SelectTrigger>
                 <SelectContent>

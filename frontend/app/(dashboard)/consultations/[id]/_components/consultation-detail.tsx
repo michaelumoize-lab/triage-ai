@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import type { Consultation, Patient, User, Symptom } from "@prisma/client";
 import Link from "next/link";
-import { SymptomSelector } from "@/app/(dashboard)/diagnosis/new/_components/symptom-selector"; // adjust path if needed
+import { SymptomSelector } from "@/app/(dashboard)/diagnosis/new/_components/symptom-selector";
 
 // ============================================
 // TYPES
@@ -60,6 +60,16 @@ interface ConsultationDetailProps {
 }
 
 type StatusType = "PENDING" | "COMPLETED" | "CANCELLED";
+
+// Payload for re‑diagnosis API call
+type ReDiagnosePayload = {
+  patient_id: string;
+  symptoms: string[];
+  age?: number;
+  gender?: string;
+  duration_days?: number;
+  red_flags?: string[];
+};
 
 // ============================================
 // HELPERS
@@ -100,9 +110,8 @@ export function ConsultationDetail({
   );
 
   // For symptom editing
-  const initialSymptoms = (consultation.symptomNames as string[]) || [];
-  const [editedSymptoms, setEditedSymptoms] =
-    useState<string[]>(initialSymptoms);
+  const symptomNames = (consultation.symptomNames as string[]) || [];
+  const [editedSymptoms, setEditedSymptoms] = useState<string[]>(symptomNames);
 
   const handleSave = () => {
     startTransition(async () => {
@@ -129,14 +138,29 @@ export function ConsultationDetail({
 
     setIsReDiagnosing(true);
     try {
-      // 1. Call diagnosis API with new symptoms
+      // 1. Build typed payload with symptoms and demographics
+      const payload: ReDiagnosePayload = {
+        patient_id: consultation.patientId,
+        symptoms: editedSymptoms,
+      };
+
+      if (consultation.patient) {
+        if (
+          consultation.patient.age !== null &&
+          consultation.patient.age !== undefined
+        ) {
+          payload.age = consultation.patient.age;
+        }
+        if (consultation.patient.gender) {
+          payload.gender = consultation.patient.gender;
+        }
+        // duration_days could be added here if stored in the consultation
+      }
+
       const response = await fetch("/api/diagnose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          patient_id: consultation.patientId,
-          symptoms: editedSymptoms,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -180,8 +204,14 @@ export function ConsultationDetail({
     }
   };
 
-  // Parse symptoms from JSON
-  const symptomNames = (consultation.symptomNames as string[]) || [];
+  const handleToggleEdit = () => {
+    if (isEditingSymptoms) {
+      // Cancel: reset to original symptoms and close editor
+      setEditedSymptoms(symptomNames);
+    }
+    setIsEditingSymptoms(!isEditingSymptoms);
+  };
+
   const topPredictions =
     (consultation.topPredictions as Array<{
       condition: string;
@@ -310,7 +340,7 @@ export function ConsultationDetail({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setIsEditingSymptoms(!isEditingSymptoms)}
+            onClick={handleToggleEdit}
             className="gap-1"
           >
             {isEditingSymptoms ? (

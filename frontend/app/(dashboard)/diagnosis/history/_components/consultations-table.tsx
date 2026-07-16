@@ -100,11 +100,12 @@ export function ConsultationsTable({ consultations }: ConsultationsTableProps) {
               Start a new diagnosis to see results here
             </p>
           </div>
-          <Link href="/diagnosis/new">
-            <button className={buttonVariants({ variant: "default" })}>
-              New Diagnosis
-            </button>
-          </Link>
+          <Link
+            href="/diagnosis/new"
+            className={buttonVariants({ variant: "default" })}
+          >
+            New Diagnosis
+          </Link>{" "}
         </CardContent>
       </Card>
     );
@@ -160,12 +161,16 @@ export function ConsultationsTable({ consultations }: ConsultationsTableProps) {
             {filtered.map((consultation) => (
               <TableRow
                 key={consultation.id}
-                onClick={() => router.push(`/consultations/${consultation.id}`)}
-                className="cursor-pointer hover:bg-muted/50 transition-colors"
+                className="hover:bg-muted/50 transition-colors"
               >
                 <TableCell className="font-medium">
-                  {consultation.patient?.name || "Unknown Patient"}
-                </TableCell>
+                  <Link
+                    href={`/consultations/${consultation.id}`}
+                    className="underline-offset-4 hover:underline"
+                  >
+                    {consultation.patient?.name || "Unknown Patient"}
+                  </Link>
+                </TableCell>{" "}
                 <TableCell>
                   <div className="flex items-center gap-1 text-sm">
                     <Calendar className="h-3.5 w-3.5 text-muted-foreground" />

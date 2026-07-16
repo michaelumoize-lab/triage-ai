@@ -65,6 +65,8 @@ export async function updateProfile(data: UpdateProfileInput) {
   return { success: true };
 }
 
+import { headers } from "next/headers";
+
 export async function changePassword(data: ChangePasswordInput) {
   const session = await getServerSession();
   if (!session) {
@@ -75,13 +77,12 @@ export async function changePassword(data: ChangePasswordInput) {
 
   // Use Better Auth to change password
   await auth.api.changePassword({
-    headers: new Headers(),
+    headers: await headers(),
     body: {
       currentPassword: validated.currentPassword,
       newPassword: validated.newPassword,
     },
   });
-
   revalidatePath("/settings");
 
   return { success: true };

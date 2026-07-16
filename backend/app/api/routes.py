@@ -77,5 +77,5 @@ async def diagnose(symptoms: SymptomInput):
         return diagnosis
 
     except Exception as e:
-        logger.error(f"Error in diagnosis: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Error in diagnosis")
+        raise HTTPException(status_code=500, detail="Diagnosis service failed")
