@@ -6,8 +6,7 @@
     },
     "backend": {
       "root": "backend/",
-      "entrypoint": "app.main:app",
-      "python": "3.11"
+      "entrypoint": "app.main:app"
     }
   },
   "rewrites": [
