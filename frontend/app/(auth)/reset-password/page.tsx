@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { ResetPasswordForm } from "./reset-password-form";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Reset password",
 };
