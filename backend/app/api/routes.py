@@ -3,6 +3,9 @@ from app.models.schemas import SymptomInput, DiagnosisResponse, TriageLevel, Dia
 from app.services.prediction_service import PredictionService
 import logging
 
+from app.services.disease_service import DiseaseService
+from app.models.schemas import DiseaseExplanationResponse
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -79,3 +82,18 @@ async def diagnose(symptoms: SymptomInput):
     except Exception as e:
         logger.exception("Error in diagnosis")
         raise HTTPException(status_code=500, detail="Diagnosis service failed")
+
+
+@router.get("/disease/{name}/explain", response_model=DiseaseExplanationResponse)
+async def explain_disease(name: str):
+    """
+    Get a detailed explanation of a disease.
+    Checks the database first; if not found, generates via LLM.
+    """
+    service = DiseaseService(prisma)
+    result = await service.get_or_generate_explanation(name)
+    
+    if not result:
+        raise HTTPException(status_code=404, detail="Disease not found")
+    
+    return result

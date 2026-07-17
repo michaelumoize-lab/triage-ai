@@ -43,3 +43,11 @@ class DiagnosisResponse(BaseModel):
     recommended_specialist: str
     confidence_score: float = Field(ge=0, le=1)
     treatment_urgency: Optional[str] = None
+
+class DiseaseExplanationResponse(BaseModel):
+    name: str
+    description: Optional[str] = None
+    treatment: Optional[str] = None
+    symptoms: List[str] = []
+    specialist: Optional[str] = None
+    category: Optional[str] = None
