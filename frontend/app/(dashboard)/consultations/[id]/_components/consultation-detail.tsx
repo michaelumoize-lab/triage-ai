@@ -33,10 +33,19 @@ import {
   Activity,
   Edit,
   X,
+  BookOpen,
+  Loader2,
 } from "lucide-react";
 import type { Consultation, Patient, User, Symptom } from "@prisma/client";
 import Link from "next/link";
 import { SymptomSelector } from "@/app/(dashboard)/diagnosis/new/_components/symptom-selector";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 // ============================================
 // TYPES
@@ -70,6 +79,15 @@ type ReDiagnosePayload = {
   duration_days?: number;
   red_flags?: string[];
 };
+
+interface DiseaseExplanation {
+  name: string;
+  description: string;
+  treatment: string;
+  symptoms: string[];
+  specialist: string;
+  category?: string | null;
+}
 
 // ============================================
 // HELPERS
@@ -112,6 +130,13 @@ export function ConsultationDetail({
   // For symptom editing
   const symptomNames = (consultation.symptomNames as string[]) || [];
   const [editedSymptoms, setEditedSymptoms] = useState<string[]>(symptomNames);
+
+  // For "Learn More" feature
+  const [isExplanationOpen, setIsExplanationOpen] = useState(false);
+  const [explanation, setExplanation] = useState<DiseaseExplanation | null>(
+    null,
+  );
+  const [isLoadingExplanation, setIsLoadingExplanation] = useState(false);
 
   const handleSave = () => {
     startTransition(async () => {
@@ -212,6 +237,36 @@ export function ConsultationDetail({
     setIsEditingSymptoms(!isEditingSymptoms);
   };
 
+  const handleLearnMore = async () => {
+    if (explanation) {
+      setIsExplanationOpen(true);
+      return;
+    }
+
+    const diseaseName = consultation.predictedDisease;
+    if (!diseaseName) {
+      toast.error("No disease to explain");
+      return;
+    }
+
+    const url = `/api/v1/disease/${encodeURIComponent(diseaseName)}/explain`;
+    setIsLoadingExplanation(true);
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setExplanation(data);
+      setIsExplanationOpen(true);
+    } catch (error) {
+      console.error("Error fetching explanation:", error);
+      toast.error("Could not load disease explanation. Please try again.");
+    } finally {
+      setIsLoadingExplanation(false);
+    }
+  };
+
   const topPredictions =
     (consultation.topPredictions as Array<{
       condition: string;
@@ -219,324 +274,415 @@ export function ConsultationDetail({
     }>) || [];
 
   return (
-    <div className="space-y-6">
-      {/* Summary Card */}
-      <Card>
-        <CardContent className="p-6 space-y-4">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Calendar className="h-4 w-4" />
-                {new Date(consultation.createdAt).toLocaleString()}
-              </div>
-              <div className="flex items-center gap-2 mt-1">
-                <UserIcon className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">
-                  {consultation.patient?.name || "Unknown Patient"}
-                </span>
-              </div>
-              {consultation.doctor && (
+    <>
+      <div className="space-y-6">
+        {/* Summary Card */}
+        <Card>
+          <CardContent className="p-6 space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Stethoscope className="h-4 w-4" />
-                  Dr. {consultation.doctor.name}
-                  {consultation.doctor.specialty &&
-                    ` • ${consultation.doctor.specialty}`}
+                  <Calendar className="h-4 w-4" />
+                  {new Date(consultation.createdAt).toLocaleString()}
                 </div>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {consultation.isEmergency && (
-                <Badge variant="destructive">🚨 Emergency</Badge>
-              )}
-              <Badge className={statusColors[status]}>
-                {statusLabels[status]}
-              </Badge>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Confidence Score</p>
-              <div className="flex items-center gap-3 mt-1">
-                <Progress
-                  value={(consultation.confidence || 0) * 100}
-                  className="h-2 flex-1"
-                />
-                <span className="text-sm font-medium">
-                  {((consultation.confidence || 0) * 100).toFixed(0)}%
-                </span>
-              </div>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Status</p>
-              <Badge className={statusColors[status]}>
-                {statusLabels[status]}
-              </Badge>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Primary Diagnosis */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Brain className="h-5 w-5 text-primary" />
-            AI Diagnosis
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <p className="text-sm text-muted-foreground">Predicted Disease</p>
-            <p className="text-2xl font-bold">
-              {consultation.predictedDisease || "Not available"}
-            </p>
-          </div>
-
-          {topPredictions.length > 0 && (
-            <div>
-              <p className="text-sm text-muted-foreground mb-2">
-                Top Predictions
-              </p>
-              <div className="space-y-2">
-                {topPredictions.map((pred, index) => (
-                  <div key={index} className="flex items-center gap-3">
-                    <span className="text-sm min-w-[120px]">
-                      {pred.condition}
-                    </span>
-                    <Progress
-                      value={pred.probability * 100}
-                      className="h-2 flex-1"
-                    />
-                    <span className="text-sm font-medium min-w-[40px]">
-                      {(pred.probability * 100).toFixed(0)}%
-                    </span>
+                <div className="flex items-center gap-2 mt-1">
+                  <UserIcon className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">
+                    {consultation.patient?.name || "Unknown Patient"}
+                  </span>
+                </div>
+                {consultation.doctor && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Stethoscope className="h-4 w-4" />
+                    Dr. {consultation.doctor.name}
+                    {consultation.doctor.specialty &&
+                      ` • ${consultation.doctor.specialty}`}
                   </div>
-                ))}
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {consultation.isEmergency && (
+                  <Badge variant="destructive">🚨 Emergency</Badge>
+                )}
+                <Badge className={statusColors[status]}>
+                  {statusLabels[status]}
+                </Badge>
               </div>
             </div>
-          )}
 
-          {consultation.explanation && (
-            <div>
-              <p className="text-sm text-muted-foreground">Explanation</p>
-              <p className="text-sm mt-1">
-                {typeof consultation.explanation === "string"
-                  ? consultation.explanation
-                  : JSON.stringify(consultation.explanation)}
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Symptoms – with Edit mode */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Activity className="h-5 w-5 text-muted-foreground" />
-            Selected Symptoms
-          </CardTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleToggleEdit}
-            className="gap-1"
-          >
-            {isEditingSymptoms ? (
-              <>
-                <X className="h-4 w-4" />
-                Cancel
-              </>
-            ) : (
-              <>
-                <Edit className="h-4 w-4" />
-                Edit
-              </>
-            )}
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {isEditingSymptoms ? (
-            <div className="space-y-4">
-              <SymptomSelector
-                symptoms={allSymptoms}
-                selectedSymptoms={editedSymptoms}
-                onToggle={(symptomName) => {
-                  setEditedSymptoms((prev) =>
-                    prev.includes(symptomName)
-                      ? prev.filter((s) => s !== symptomName)
-                      : [...prev, symptomName],
-                  );
-                }}
-                onSubmit={handleReDiagnose}
-                isLoading={isReDiagnosing}
-                selectedCount={editedSymptoms.length}
-              />
-              <div className="text-sm text-muted-foreground">
-                {editedSymptoms.length} symptoms selected
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {symptomNames.length > 0 ? (
-                symptomNames.map((symptom) => (
-                  <Badge key={symptom} variant="secondary">
-                    {symptom.replace(/_/g, " ")}
-                  </Badge>
-                ))
-              ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
                 <p className="text-sm text-muted-foreground">
-                  No symptoms recorded
+                  Confidence Score
                 </p>
+                <div className="flex items-center gap-3 mt-1">
+                  <Progress
+                    value={(consultation.confidence || 0) * 100}
+                    className="h-2 flex-1"
+                  />
+                  <span className="text-sm font-medium">
+                    {((consultation.confidence || 0) * 100).toFixed(0)}%
+                  </span>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Status</p>
+                <Badge className={statusColors[status]}>
+                  {statusLabels[status]}
+                </Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Primary Diagnosis */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Brain className="h-5 w-5 text-primary" />
+              AI Diagnosis
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Predicted Disease</p>
+              <p className="text-2xl font-bold">
+                {consultation.predictedDisease || "Not available"}
+              </p>
+              {consultation.predictedDisease && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleLearnMore}
+                  disabled={isLoadingExplanation}
+                  className="mt-2 gap-1 text-muted-foreground hover:text-foreground"
+                >
+                  {isLoadingExplanation ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <BookOpen className="h-3 w-3" />
+                      Learn More
+                    </>
+                  )}
+                </Button>
               )}
             </div>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Red Flags */}
-      {consultation.emergencySymptoms &&
-        consultation.emergencySymptoms.length > 0 && (
-          <Card className="border-red-200 dark:border-red-800">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-lg text-red-600 dark:text-red-400">
-                <AlertTriangle className="h-5 w-5" />
-                Red Flags
+            {topPredictions.length > 0 && (
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Top Predictions
+                </p>
+                <div className="space-y-2">
+                  {topPredictions.map((pred, index) => (
+                    <div key={index} className="flex items-center gap-3">
+                      <span className="text-sm min-w-[120px]">
+                        {pred.condition}
+                      </span>
+                      <Progress
+                        value={pred.probability * 100}
+                        className="h-2 flex-1"
+                      />
+                      <span className="text-sm font-medium min-w-[40px]">
+                        {(pred.probability * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {consultation.explanation && (
+              <div>
+                <p className="text-sm text-muted-foreground">Explanation</p>
+                <p className="text-sm mt-1">
+                  {typeof consultation.explanation === "string"
+                    ? consultation.explanation
+                    : JSON.stringify(consultation.explanation)}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Symptoms – with Edit mode */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Activity className="h-5 w-5 text-muted-foreground" />
+              Selected Symptoms
+            </CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleToggleEdit}
+              className="gap-1"
+            >
+              {isEditingSymptoms ? (
+                <>
+                  <X className="h-4 w-4" />
+                  Cancel
+                </>
+              ) : (
+                <>
+                  <Edit className="h-4 w-4" />
+                  Edit
+                </>
+              )}
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {isEditingSymptoms ? (
+              <div className="space-y-4">
+                <SymptomSelector
+                  symptoms={allSymptoms}
+                  selectedSymptoms={editedSymptoms}
+                  onToggle={(symptomName) => {
+                    setEditedSymptoms((prev) =>
+                      prev.includes(symptomName)
+                        ? prev.filter((s) => s !== symptomName)
+                        : [...prev, symptomName],
+                    );
+                  }}
+                  onSubmit={handleReDiagnose}
+                  isLoading={isReDiagnosing}
+                  selectedCount={editedSymptoms.length}
+                />
+                <div className="text-sm text-muted-foreground">
+                  {editedSymptoms.length} symptoms selected
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {symptomNames.length > 0 ? (
+                  symptomNames.map((symptom) => (
+                    <Badge key={symptom} variant="secondary">
+                      {symptom.replace(/_/g, " ")}
+                    </Badge>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No symptoms recorded
+                  </p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Red Flags */}
+        {consultation.emergencySymptoms &&
+          consultation.emergencySymptoms.length > 0 && (
+            <Card className="border-red-200 dark:border-red-800">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-lg text-red-600 dark:text-red-400">
+                  <AlertTriangle className="h-5 w-5" />
+                  Red Flags
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="list-disc list-inside space-y-1">
+                  {consultation.emergencySymptoms.map((flag, index) => (
+                    <li
+                      key={index}
+                      className="text-sm text-red-600 dark:text-red-400"
+                    >
+                      {flag.replace(/_/g, " ")}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+
+        {/* Feedback */}
+        {consultation.feedback && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                Doctor&apos;s Feedback
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <ul className="list-disc list-inside space-y-1">
-                {consultation.emergencySymptoms.map((flag, index) => (
-                  <li
-                    key={index}
-                    className="text-sm text-red-600 dark:text-red-400"
-                  >
-                    {flag.replace(/_/g, " ")}
-                  </li>
-                ))}
-              </ul>
+            <CardContent className="space-y-2">
+              <div className="flex items-center gap-4">
+                <Badge
+                  variant={
+                    consultation.feedback.wasCorrect ? "default" : "destructive"
+                  }
+                >
+                  {consultation.feedback.wasCorrect
+                    ? "✅ Correct"
+                    : "❌ Incorrect"}
+                </Badge>
+                {consultation.feedback.confidenceRating && (
+                  <span className="text-sm text-muted-foreground">
+                    Confidence: {consultation.feedback.confidenceRating}/5
+                  </span>
+                )}
+              </div>
+              {consultation.feedback.actualDisease && (
+                <p className="text-sm">
+                  <span className="font-medium">Actual Disease:</span>{" "}
+                  {consultation.feedback.actualDisease}
+                </p>
+              )}
+              {consultation.feedback.comments && (
+                <p className="text-sm text-muted-foreground">
+                  {consultation.feedback.comments}
+                </p>
+              )}
             </CardContent>
           </Card>
         )}
 
-      {/* Feedback */}
-      {consultation.feedback && (
+        {/* Doctor's Notes & Actions */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <CheckCircle className="h-5 w-5 text-green-600" />
-              Doctor&apos;s Feedback
+              <FileText className="h-5 w-5 text-muted-foreground" />
+              Clinical Review
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex items-center gap-4">
-              <Badge
-                variant={
-                  consultation.feedback.wasCorrect ? "default" : "destructive"
-                }
-              >
-                {consultation.feedback.wasCorrect
-                  ? "✅ Correct"
-                  : "❌ Incorrect"}
-              </Badge>
-              {consultation.feedback.confidenceRating && (
-                <span className="text-sm text-muted-foreground">
-                  Confidence: {consultation.feedback.confidenceRating}/5
-                </span>
-              )}
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="actualDiagnosis">
+                Actual Diagnosis (if different from AI)
+              </Label>
+              <Input
+                id="actualDiagnosis"
+                placeholder="Enter the final diagnosis"
+                value={actualDiagnosis}
+                onChange={(e) => setActualDiagnosis(e.target.value)}
+              />
             </div>
-            {consultation.feedback.actualDisease && (
-              <p className="text-sm">
-                <span className="font-medium">Actual Disease:</span>{" "}
-                {consultation.feedback.actualDisease}
-              </p>
-            )}
-            {consultation.feedback.comments && (
-              <p className="text-sm text-muted-foreground">
-                {consultation.feedback.comments}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
-      {/* Doctor's Notes & Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <FileText className="h-5 w-5 text-muted-foreground" />
-            Clinical Review
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="actualDiagnosis">
-              Actual Diagnosis (if different from AI)
-            </Label>
-            <Input
-              id="actualDiagnosis"
-              placeholder="Enter the final diagnosis"
-              value={actualDiagnosis}
-              onChange={(e) => setActualDiagnosis(e.target.value)}
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Doctor&apos;s Notes</Label>
+              <Textarea
+                id="notes"
+                placeholder="Add your clinical notes..."
+                rows={4}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Doctor&apos;s Notes</Label>
-            <Textarea
-              id="notes"
-              placeholder="Add your clinical notes..."
-              rows={4}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select
+                value={status}
+                onValueChange={(val) => setStatus(val as StatusType)}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PENDING">Pending</SelectItem>
+                  <SelectItem value="COMPLETED">Completed</SelectItem>
+                  <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="status">Status</Label>
-            <Select
-              value={status}
-              onValueChange={(val) => setStatus(val as StatusType)}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="PENDING">Pending</SelectItem>
-                <SelectItem value="COMPLETED">Completed</SelectItem>
-                <SelectItem value="CANCELLED">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex flex-wrap gap-3 pt-2">
-            <Button onClick={handleSave} disabled={isPending}>
-              {isPending ? "Saving..." : "Save Changes"}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => router.push(`/patients/${consultation.patientId}`)}
-            >
-              View Patient
-            </Button>
-            {!consultation.feedback ? (
-              <Link href={`/consultations/${consultation.id}/feedback`}>
-                <Button variant="outline">Submit Feedback</Button>
-              </Link>
-            ) : (
+            <div className="flex flex-wrap gap-3 pt-2">
+              <Button onClick={handleSave} disabled={isPending}>
+                {isPending ? "Saving..." : "Save Changes"}
+              </Button>
               <Button
                 variant="outline"
                 onClick={() =>
-                  router.push(`/consultations/${consultation.id}/feedback`)
+                  router.push(`/patients/${consultation.patientId}`)
                 }
               >
-                Update Feedback
+                View Patient
               </Button>
+              {!consultation.feedback ? (
+                <Link href={`/consultations/${consultation.id}/feedback`}>
+                  <Button variant="outline">Submit Feedback</Button>
+                </Link>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    router.push(`/consultations/${consultation.id}/feedback`)
+                  }
+                >
+                  Update Feedback
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Explanation Dialog */}
+      <Dialog open={isExplanationOpen} onOpenChange={setIsExplanationOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">
+              {explanation?.name || consultation.predictedDisease || "Disease"}
+            </DialogTitle>
+            {explanation?.category && (
+              <DialogDescription className="text-sm text-muted-foreground">
+                Category: {explanation.category}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <div className="space-y-4">
+            {explanation?.description && (
+              <div>
+                <h4 className="font-semibold text-sm text-muted-foreground mb-1">
+                  Overview
+                </h4>
+                <p className="text-sm leading-relaxed">
+                  {explanation.description}
+                </p>
+              </div>
+            )}
+            {explanation?.symptoms && explanation.symptoms.length > 0 && (
+              <div>
+                <h4 className="font-semibold text-sm text-muted-foreground mb-1">
+                  Common Symptoms
+                </h4>
+                <ul className="list-disc list-inside text-sm space-y-1">
+                  {explanation.symptoms.map((symptom) => (
+                    <li key={symptom}>{symptom}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {explanation?.treatment && (
+              <div>
+                <h4 className="font-semibold text-sm text-muted-foreground mb-1">
+                  Treatment
+                </h4>
+                <p className="text-sm leading-relaxed">
+                  {explanation.treatment}
+                </p>
+              </div>
+            )}
+            {explanation?.specialist && (
+              <div>
+                <h4 className="font-semibold text-sm text-muted-foreground mb-1">
+                  Recommended Specialist
+                </h4>
+                <p className="text-sm font-medium">{explanation.specialist}</p>
+              </div>
+            )}
+            {!explanation && (
+              <div className="text-center py-8 text-muted-foreground">
+                No explanation available.
+              </div>
             )}
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

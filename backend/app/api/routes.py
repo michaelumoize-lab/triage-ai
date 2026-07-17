@@ -1,3 +1,5 @@
+import os
+
 from fastapi import APIRouter, HTTPException
 from app.models.schemas import SymptomInput, DiagnosisResponse, TriageLevel, DiagnosisItem
 from app.services.prediction_service import PredictionService
@@ -5,6 +7,8 @@ import logging
 
 from app.services.disease_service import DiseaseService
 from app.models.schemas import DiseaseExplanationResponse
+
+from app.db import prisma
 
 logger = logging.getLogger(__name__)
 
@@ -92,8 +96,6 @@ async def explain_disease(name: str):
     """
     service = DiseaseService(prisma)
     result = await service.get_or_generate_explanation(name)
-    
     if not result:
         raise HTTPException(status_code=404, detail="Disease not found")
-    
     return result
