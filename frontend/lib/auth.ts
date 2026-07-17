@@ -8,12 +8,14 @@ if (!BETTER_AUTH_SECRET) {
 }
 
 export const auth = betterAuth({
-  // Database adapter
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
-
   secret: BETTER_AUTH_SECRET,
+  trustedOrigins: [
+    "http://localhost:3000",
+    "https://triage-ai-ashy.vercel.app",
+  ],
 
   // Email & Password Authentication
   emailAndPassword: {
