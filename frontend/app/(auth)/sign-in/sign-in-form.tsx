@@ -1,6 +1,5 @@
 "use client";
 
-import { GitHubIcon } from "@/components/icons/GitHubIcon";
 import { GoogleIcon } from "@/components/icons/GoogleIcon";
 import { LoadingButton } from "@/components/loading-button";
 import { Logo } from "@/components/logo";
@@ -189,17 +188,6 @@ export function SignInForm() {
               >
                 <GoogleIcon width="0.98em" height="1em" />
                 Sign in with Google
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full gap-2"
-                disabled={loading}
-                onClick={() => handleSocialSignIn("github")}
-              >
-                <GitHubIcon />
-                Sign in with Github
               </Button>
             </div>
           </form>

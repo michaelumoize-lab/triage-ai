@@ -85,6 +85,27 @@ export function AddPatientButton() {
             </div>
           </div>
 
+          {/* Blood Type - NEW */}
+          <div className="space-y-2">
+            <Label htmlFor="bloodType">Blood Type</Label>
+            <Select name="bloodType" defaultValue="UNKNOWN">
+              <SelectTrigger>
+                <SelectValue placeholder="Select blood type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="A_POSITIVE">A Positive</SelectItem>
+                <SelectItem value="A_NEGATIVE">A Negative</SelectItem>
+                <SelectItem value="B_POSITIVE">B Positive</SelectItem>
+                <SelectItem value="B_NEGATIVE">B Negative</SelectItem>
+                <SelectItem value="AB_POSITIVE">AB Positive</SelectItem>
+                <SelectItem value="AB_NEGATIVE">AB Negative</SelectItem>
+                <SelectItem value="O_POSITIVE">O Positive</SelectItem>
+                <SelectItem value="O_NEGATIVE">O Negative</SelectItem>
+                <SelectItem value="UNKNOWN">Unknown</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Contact Info */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
